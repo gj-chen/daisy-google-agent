@@ -1,37 +1,40 @@
-import os
 from flask import Flask, request, jsonify
 import requests
-from bs4 import BeautifulSoup
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
-                  "Chrome/122.0.0.0 Safari/537.36"
-}
+@app.route('/', methods=['GET'])
+def home():
+    print("[LOG] Google Image Agent is running")
+    return "Google Image Agent running!"
 
 @app.route('/search-google-images', methods=['GET'])
 def search_google_images():
     query = request.args.get('q')
-    if not query:
-        return jsonify({"error": "No query provided."}), 400
+    print("[LOG] Received query:", query)
 
-    url = f"https://www.google.com/search?tbm=isch&q={query}"
-    
-    response = requests.get(url, headers=HEADERS)
-    
-    if response.status_code != 200:
-        return jsonify({"error": "Failed to fetch images."}), 500
+    params = {
+        'engine': 'google_images',
+        'q': query,
+        'api_key': SERPAPI_API_KEY
+    }
 
-    soup = BeautifulSoup(response.text, 'html.parser')
-    images = soup.find_all('img')[1:21]  # Skip the first image (logo)
+    serp_response = requests.get("https://serpapi.com/search", params=params).json()
+    print("[LOG] SerpAPI Response:", serp_response)
 
-    image_urls = [img['src'] for img in images if 'src' in img.attrs]
+    images = [
+        img['original']
+        for img in serp_response.get('images_results', [])[:20]
+    ]
 
-    return jsonify({"images": image_urls})
+    print("[LOG] Returned images:", images)
+    return jsonify({"images": images})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 8000)))
+    print("[LOG] Starting Google Image Agent...")
+    app.run(host='0.0.0.0', port=8000)
